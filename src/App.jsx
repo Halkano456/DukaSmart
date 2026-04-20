@@ -1,102 +1,194 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import {
+  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, 
+  ArcElement, Title, Tooltip, Legend, Filler
+} from 'chart.js';
+import { Line, Doughnut } from 'react-chartjs-2';
+import './App.css';
 
-export default function App() {
-  const [products, setProducts] = useState([
-    { id: 1, name: 'Maize Flour (2kg)', price: 200, quantity: 15 },
-    { id: 2, name: 'Cooking Oil (1L)', price: 350, quantity: 4 } // Low stock example
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler);
+
+const App = () => {
+  // --- STATE MANAGEMENT ---
+  const [inventory, setInventory] = useState([
+    { id: 1, name: 'Indomie Pack', stock: 12, price: 50, category: 'Snacks', expiry: '2026-05-13' },
+    { id: 2, name: 'Kibao Vodka', stock: 8, price: 1200, category: 'Beverages', expiry: '2026-06-14' },
+    { id: 3, name: 'Safari Airtime', stock: 110, price: 100, category: 'Essentials', expiry: '2027-01-01' },
   ]);
-  const [sales, setSales] = useState(0);
-  const [name, setName] = useState('');
-  const [price, setPrice] = useState('');
-  const [qty, setQty] = useState('');
 
-  const addProduct = (e) => {
+  const [sales, setSales] = useState([
+    { id: 'TXN-120394', name: 'Safari Airtime', qty: 2, time: '11:45 AM', price: 200 },
+  ]);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({ name: '', stock: '', price: '', category: 'General', expiry: '' });
+
+  // --- ANALYTICS ---
+  const totalRevenue = useMemo(() => sales.reduce((acc, curr) => acc + curr.price, 0), [sales]);
+  const inventoryValue = useMemo(() => inventory.reduce((acc, curr) => acc + (curr.price * curr.stock), 0), [inventory]);
+  const lowStockItems = inventory.filter(i => i.stock < 10).length;
+
+  // --- CORE FUNCTIONS ---
+  const handleAddProduct = (e) => {
     e.preventDefault();
-    if (!name || !price) return;
-    const newProd = { id: Date.now(), name, price: Number(price), quantity: Number(qty) };
-    setProducts([...products, newProd]);
-    setName(''); setPrice(''); setQty('');
+    const newProduct = {
+      id: Date.now(),
+      name: formData.name,
+      stock: parseInt(formData.stock),
+      price: parseInt(formData.price),
+      category: formData.category,
+      expiry: formData.expiry || 'N/A'
+    };
+    setInventory([...inventory, newProduct]);
+    setIsModalOpen(false); // Close Modal
+    setFormData({ name: '', stock: '', price: '', category: 'General', expiry: '' }); // Reset Form
   };
 
-  const sellProduct = (id) => {
-    setProducts(products.map(p => {
-      if (p.id === id && p.quantity > 0) {
-        setSales(prev => prev + p.price);
-        return { ...p, quantity: p.quantity - 1 };
-      }
-      return p;
-    }));
+  const handleSell = (item) => {
+    if (item.stock <= 0) return alert("Product out of stock!");
+    setInventory(prev => prev.map(i => i.id === item.id ? { ...i, stock: i.stock - 1 } : i));
+    const newTxn = {
+      id: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+      name: item.name,
+      qty: 1,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      price: item.price
+    };
+    setSales(prev => [newTxn, ...prev]);
+  };
+
+  // --- CHART CONFIG ---
+  const lineData = {
+    labels: ['12/20', '12/22', '12/24', '12/26', '12/28', '12/30'],
+    datasets: [{
+      data: [10, 18, 12, 16, 28, 22],
+      borderColor: '#38bdf8',
+      borderWidth: 3,
+      fill: true,
+      backgroundColor: 'rgba(56, 189, 248, 0.1)',
+      tension: 0.4,
+    }]
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-12">
-      <header className="max-w-6xl mx-auto flex justify-between items-center mb-10">
-        <div>
-          <h1 className="text-4xl font-extrabold text-blue-700 tracking-tight">DukaSmart</h1>
-          <p className="text-gray-500 font-medium">Retail Management Intelligence</p>
+    <div className="pos-shell">
+      <header className="header-master">
+        <div className="branding">
+          <div className="brand-box">🏪</div>
+          <h1>DukaSmart</h1>
         </div>
-        <div className="bg-white px-6 py-4 rounded-2xl shadow-sm border border-blue-100 text-right">
-          <p className="text-xs uppercase tracking-widest text-gray-400 font-bold">Total Revenue</p>
-          <p className="text-3xl font-black text-green-600">KES {sales.toLocaleString()}</p>
+        <div className="header-meta">
+          <div className="profile-badge">Admin ▼</div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left: Add Product Form */}
-        <div className="bg-white p-8 rounded-3xl shadow-xl shadow-blue-900/5 border border-gray-100 h-fit">
-          <h2 className="text-xl font-bold mb-6 text-gray-800">Restock Inventory</h2>
-          <form onSubmit={addProduct} className="space-y-4">
-            <div>
-              <label className="text-sm font-semibold text-gray-600 ml-1">Product Name</label>
-              <input className="w-full mt-1 p-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500" placeholder="e.g. Sugar" value={name} onChange={e => setName(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-semibold text-gray-600 ml-1">Price</label>
-                <input className="w-full mt-1 p-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500" type="number" placeholder="KES" value={price} onChange={e => setPrice(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 ml-1">Qty</label>
-                <input className="w-full mt-1 p-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500" type="number" placeholder="0" value={qty} onChange={e => setQty(e.target.value)} />
-              </div>
-            </div>
-            <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95">Add to Stock</button>
-          </form>
-        </div>
-
-        {/* Right: Product Table */}
-        <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl shadow-blue-900/5 border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-50">
-            <h2 className="text-xl font-bold text-gray-800">Live Inventory</h2>
+      <main className="dashboard-grid">
+        <section className="kpi-container">
+          <div className="glass-card kpi blue-glow">
+            <label>Total Revenue <span className="live-chip">Live</span></label>
+            <h2>KES {totalRevenue.toLocaleString()}</h2>
           </div>
-          <table className="w-full">
-            <thead className="bg-gray-50 text-gray-400 text-xs uppercase font-bold">
-              <tr>
-                <th className="px-6 py-4 text-left">Product</th>
-                <th className="px-6 py-4 text-left">Price</th>
-                <th className="px-6 py-4 text-left">Status</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {products.map(p => (
-                <tr key={p.id} className="hover:bg-blue-50/30 transition-colors">
-                  <td className="px-6 py-5 font-bold text-gray-700">{p.name}</td>
-                  <td className="px-6 py-5 text-gray-600 font-medium">KES {p.price}</td>
-                  <td className="px-6 py-5">
-                    <span className={`px-3 py-1 rounded-full text-xs font-black ${p.quantity < 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                      {p.quantity} UNITS
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 text-right">
-                    <button onClick={() => sellProduct(p.id)} className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-600 transition-colors">Record Sale</button>
-                  </td>
-                </tr>
+          <div className="glass-card kpi">
+            <label>Inventory Value</label>
+            <h2>KES {inventoryValue.toLocaleString()}</h2>
+          </div>
+          <div className="glass-card kpi alert-critical">
+            <label>Low Stock Alerts</label>
+            <h2 className="neon-red">{lowStockItems} Alerts</h2>
+          </div>
+          <div className="glass-card kpi">
+            <label>Today's Sales</label>
+            <h2>KES 32,450</h2>
+          </div>
+        </section>
+
+        <section className="analytics-container">
+          <div className="glass-card main-chart">
+            <h3>Sales Overview</h3>
+            <div className="chart-box">
+              <Line data={lineData} options={{ responsive: true, maintainAspectRatio: false }} />
+            </div>
+          </div>
+          <div className="glass-card distribution">
+            <h3>Category Split</h3>
+            <Doughnut 
+              data={{
+                labels: ['Bev', 'Snack', 'Ess'],
+                datasets: [{ data: [350, 120, 200], backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'], borderWidth: 0 }]
+              }} 
+              options={{ cutout: '75%' }} 
+            />
+          </div>
+        </section>
+
+        <section className="management-container">
+          <div className="glass-card table-section">
+            <div className="card-top">
+              <h3>Inventory Management</h3>
+              <button className="btn-solid" onClick={() => setIsModalOpen(true)}>+ Add Product</button>
+            </div>
+            <div className="table-responsive">
+              <table className="pos-table">
+                <thead>
+                  <tr><th>Product</th><th>Stock</th><th>Price</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {inventory.map(item => (
+                    <tr key={item.id}>
+                      <td>{item.name}</td>
+                      <td className={item.stock < 10 ? 'red-text' : ''}>{item.stock}</td>
+                      <td>{item.price}</td>
+                      <td>
+                        <button className="btn-sm-sell" onClick={() => handleSell(item)}>Sell</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="glass-card txn-section">
+            <h3>Recent Transactions</h3>
+            <div className="txn-feed">
+              {sales.slice(0, 6).map(s => (
+                <div key={s.id} className="txn-card">
+                  <div className="txn-body">
+                    <strong>{s.id}</strong>
+                    <small>{s.name}</small>
+                  </div>
+                  <span className="time">{s.time}</span>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </div>
+        </section>
       </main>
+
+      {/* --- ADD PRODUCT MODAL --- */}
+      {isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card">
+            <h2>Add New Product</h2>
+            <form onSubmit={handleAddProduct}>
+              <input type="text" placeholder="Product Name" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              <div className="form-row">
+                <input type="number" placeholder="Initial Stock" required value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} />
+                <input type="number" placeholder="Price (KES)" required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
+              </div>
+              <input type="text" placeholder="Category (e.g. Snacks)" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
+              <input type="date" placeholder="Expiry Date" value={formData.expiry} onChange={e => setFormData({...formData, expiry: e.target.value})} />
+              <div className="modal-actions">
+                <button type="submit" className="btn-solid">Save to Inventory</button>
+                <button type="button" className="btn-text" onClick={() => setIsModalOpen(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default App;
